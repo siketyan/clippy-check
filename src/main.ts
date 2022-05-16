@@ -1,78 +1,87 @@
-import * as core from '@actions/core';
-import * as exec from '@actions/exec';
-import * as github from '@actions/github';
+import core from "@actions/core";
+import exec from "@actions/exec";
+import github from "@actions/github";
 
-import {Cargo, Cross} from '@actions-rs/core';
-import * as input from './input';
-import {CheckRunner} from './check';
+import { ActionInput, getActionInput } from "./input";
+import { Cargo, get } from "./cargo";
+import { CheckRunner } from "./check";
+import { getOrInstall } from "./cross";
 
-export async function run(actionInput: input.Input): Promise<void> {
+async function getVersions(program: Cargo) {
+    let rustcVersion = "";
+    let cargoVersion = "";
+    let clippyVersion = "";
+    await exec.exec("rustc", ["-V"], {
+        silent: true,
+        listeners: {
+            stdout: (buffer: Buffer) =>
+                (rustcVersion = buffer.toString().trim()),
+        },
+    });
+    await program.call(["-V"], {
+        silent: true,
+        listeners: {
+            stdout: (buffer: Buffer) =>
+                (cargoVersion = buffer.toString().trim()),
+        },
+    });
+    await program.call(["clippy", "-V"], {
+        silent: true,
+        listeners: {
+            stdout: (buffer: Buffer) =>
+                (clippyVersion = buffer.toString().trim()),
+        },
+    });
+    return { rustcVersion, cargoVersion, clippyVersion };
+}
+
+export async function run(actionInput: ActionInput): Promise<void> {
     const startedAt = new Date().toISOString();
 
     let program;
     if (actionInput.useCross) {
-        program = await Cross.getOrInstall();
+        program = await getOrInstall();
     } else {
-        program = await Cargo.get();
+        program = await get();
     }
 
     // TODO: Simplify this block
-    let rustcVersion = '';
-    let cargoVersion = '';
-    let clippyVersion = '';
-    await exec.exec('rustc', ['-V'], {
-        silent: true,
-        listeners: {
-            stdout: (buffer: Buffer) => rustcVersion = buffer.toString().trim(),
-        }
-    })
-    await program.call(['-V'], {
-        silent: true,
-        listeners: {
-            stdout: (buffer: Buffer) => cargoVersion = buffer.toString().trim(),
-        }
-    });
-    await program.call(['clippy', '-V'], {
-        silent: true,
-        listeners: {
-            stdout: (buffer: Buffer) => clippyVersion = buffer.toString().trim(),
-        }
-    });
+    const { rustcVersion, cargoVersion, clippyVersion } = await getVersions(
+        program
+    );
 
-    let args: string[] = [];
+    const args: string[] = [];
     // Toolchain selection MUST go first in any condition
     if (actionInput.toolchain) {
         args.push(`+${actionInput.toolchain}`);
     }
-    args.push('clippy');
+    args.push("clippy");
     // `--message-format=json` should just right after the `cargo clippy`
     // because usually people are adding the `-- -D warnings` at the end
     // of arguments and it will mess up the output.
-    args.push('--message-format=json');
+    args.push("--message-format=json");
 
-    args = args.concat(actionInput.args);
+    args.push(...actionInput.args);
 
-    let runner = new CheckRunner();
+    const runner = new CheckRunner();
     let clippyExitCode: number = 0;
     try {
-        core.startGroup('Executing cargo clippy (JSON output)');
+        core.startGroup("Executing cargo clippy (JSON output)");
         clippyExitCode = await program.call(args, {
             ignoreReturnCode: true,
             failOnStdErr: false,
             listeners: {
                 stdline: (line: string) => {
                     runner.tryPush(line);
-                }
-            }
+                },
+            },
         });
     } finally {
         core.endGroup();
     }
 
-    let sha = github.context.sha;
-    if (github.context.payload.pull_request?.head?.sha) {
-        sha = github.context.payload.pull_request.head.sha;
-    }
+    const sha: string =
+        github.context.payload.pull_request?.head?.sha ?? github.context.sha;
 
     await runner.executeCheck({
         token: actionInput.token,
@@ -85,22 +94,24 @@ export async function run(actionInput: input.Input): Promise<void> {
             rustc: rustcVersion,
             cargo: cargoVersion,
             clippy: clippyVersion,
-        }
+        },
     });
 
     if (clippyExitCode !== 0) {
-        throw new Error(`Clippy had exited with the ${clippyExitCode} exit code`);
+        throw new Error(
+            `Clippy had exited with the ${clippyExitCode} exit code`
+        );
     }
 }
 
 async function main(): Promise<void> {
     try {
-        const actionInput = input.get();
+        const actionInput = getActionInput();
 
         await run(actionInput);
     } catch (error) {
-        core.setFailed(error.message);
+        core.setFailed((<Error>error).message);
     }
 }
 
-main();
+void main();
