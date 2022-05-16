@@ -2,33 +2,32 @@
  * Parse action input into a some proper thing.
  */
 
-import {input} from '@actions-rs/core';
-
-import stringArgv from 'string-argv';
+import { getInput } from "@actions/core";
+import stringArgv from "string-argv";
 
 // Parsed action input
-export interface Input {
-    token: string,
-    toolchain?: string,
-    args: string[],
-    useCross: boolean,
-    name: string,
+export interface ActionInput {
+    token: string;
+    toolchain?: string;
+    args: string[];
+    useCross: boolean;
+    name: string;
 }
 
-export function get(): Input {
-    const args = stringArgv(input.getInput('args'));
-    let toolchain = input.getInput('toolchain');
-    if (toolchain.startsWith('+')) {
+export function getActionInput(): ActionInput {
+    const args = stringArgv(getInput("args"));
+    let toolchain = getInput("toolchain");
+    if (toolchain.startsWith("+")) {
         toolchain = toolchain.slice(1);
     }
-    const useCross = input.getInputBool('use-cross');
-    const name = input.getInput('name');
+    const useCross = getInput("use-cross") === "true";
+    const name = getInput("name");
 
     return {
-        token: input.getInput('token', {required: true}),
+        token: getInput("token", { required: true }),
         args: args,
         useCross: useCross,
         toolchain: toolchain || undefined,
-        name
-    }
+        name,
+    };
 }
