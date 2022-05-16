@@ -21,8 +21,6 @@
         "removeComments": true,
         "resolveJsonModule": true,
         "strict": true,
-        "strictPropertyInitialization": false,
-        "suppressImplicitAnyIndexErrors": false,
         "target": "es2018"
     },
     "include": [
