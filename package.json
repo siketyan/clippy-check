@@ -32,7 +32,6 @@
         "@actions/exec": "^1.1.1",
         "@actions/github": "^5.0.3",
         "@actions/http-client": "^2.0.1",
-        "npm-check-updates": "^13.0.0",
         "string-argv": "^0.3.1"
     },
     "devDependencies": {
