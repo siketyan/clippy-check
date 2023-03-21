@@ -1,6 +1,6 @@
-name: "rust-clippy-check"
-description: "Run clippy and annotate the diff with errors and warnings"
-author: "ructions team"
+name: "Rust Clippy Check"
+description: "Run clippy and annotate the diff with errors and warnings. Fork of actions-rs/clippy-check."
+author: "actions-rs team & ructions team"
 branding:
   icon: play-circle
   color: gray-dark
